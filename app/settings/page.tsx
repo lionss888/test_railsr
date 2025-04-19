@@ -6,47 +6,70 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { config } from "@/lib/config"
-import { RailsrAPI } from "@/lib/railsr-api"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
+
+interface ConnectionStatus {
+  status: "unknown" | "success" | "error"
+  error?: string
+  programInfo?: any
+  config?: {
+    apiKeyExists: boolean
+    programIdExists: boolean
+    apiUrl: string
+  }
+}
 
 export default function SettingsPage() {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const [connectionStatus, setConnectionStatus] = useState<"unknown" | "success" | "error">("unknown")
-  const [programInfo, setProgramInfo] = useState<any>(null)
-  const [errorDetails, setErrorDetails] = useState<string | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
+    status: "unknown",
+  })
 
   // Проверка подключения к API
   const checkConnection = async () => {
     setIsLoading(true)
-    setConnectionStatus("unknown")
-    setErrorDetails(null)
+    setConnectionStatus({ status: "unknown" })
 
     try {
-      // Проверяем наличие необходимых переменных окружения
-      if (!config.railsrApiKey || !config.railsrProgramId) {
-        throw new Error("Отсутствуют API ключ или ID программы. Проверьте переменные окружения.")
+      // Используем API-маршрут для проверки подключения
+      const response = await fetch("/api/settings/check-connection")
+      const data = await response.json()
+
+      if (data.success) {
+        setConnectionStatus({
+          status: "success",
+          programInfo: data.data,
+          config: data.config,
+        })
+
+        toast({
+          title: "Подключение успешно",
+          description: "Соединение с API Railsr установлено",
+        })
+      } else {
+        setConnectionStatus({
+          status: "error",
+          error: data.error,
+          config: data.config,
+        })
+
+        toast({
+          title: "Ошибка подключения",
+          description: data.error || "Не удалось подключиться к API Railsr",
+          variant: "destructive",
+        })
       }
-
-      const api = new RailsrAPI(config.railsrApiKey, config.railsrProgramId, config.railsrApiUrl)
-      const info = await api.getProgramInfo()
-
-      setProgramInfo(info)
-      setConnectionStatus("success")
-
-      toast({
-        title: "Подключение успешно",
-        description: "Соединение с API Railsr установлено",
-      })
     } catch (error: any) {
       console.error("API connection error:", error)
-      setConnectionStatus("error")
-      setErrorDetails(error.message || "Неизвестная ошибка")
+      setConnectionStatus({
+        status: "error",
+        error: error.message || "Произошла ошибка при проверке подключения",
+      })
 
       toast({
         title: "Ошибка подключения",
-        description: "Не удалось подключиться к API Railsr. Проверьте настройки.",
+        description: "Не удалось выполнить запрос для проверки подключения",
         variant: "destructive",
       })
     } finally {
@@ -56,9 +79,7 @@ export default function SettingsPage() {
 
   // Проверка подключения при загрузке страницы
   useEffect(() => {
-    if (config.railsrApiKey && config.railsrProgramId) {
-      checkConnection()
-    }
+    checkConnection()
   }, [])
 
   return (
@@ -74,27 +95,46 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="apiKey">API ключ</Label>
-              <Input id="apiKey" type="password" value={config.railsrApiKey ? "••••••••••••••••••••••" : ""} disabled />
+              <Input
+                id="apiKey"
+                type="password"
+                value={connectionStatus.config?.apiKeyExists ? "••••••••••••••••••••••" : ""}
+                disabled
+                placeholder="API ключ не настроен"
+              />
+              {!connectionStatus.config?.apiKeyExists && (
+                <p className="text-sm text-red-500">API ключ не настроен в переменных окружения</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="programId">ID программы</Label>
-              <Input id="programId" value={config.railsrProgramId} disabled />
+              <Input
+                id="programId"
+                value={connectionStatus.config?.programIdExists ? connectionStatus.config?.programIdExists : ""}
+                disabled
+                placeholder="ID программы не настроен"
+              />
+              {!connectionStatus.config?.programIdExists && (
+                <p className="text-sm text-red-500">ID программы не настроен в переменных окружения</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="apiUrl">URL API</Label>
-              <Input id="apiUrl" value={config.railsrApiUrl} disabled />
+              <Input id="apiUrl" value={connectionStatus.config?.apiUrl || "https://api.railsr.com/v3"} disabled />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="webhookSecret">Секретный ключ для вебхуков</Label>
-              <Input
-                id="webhookSecret"
-                type="password"
-                value={config.webhookSecret ? "••••••••••••••••••••••" : ""}
-                disabled
-              />
+            <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
+              <h3 className="font-medium text-amber-800 dark:text-amber-300">Информация о переменных окружения</h3>
+              <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
+                Для работы с API Railsr необходимо настроить следующие переменные окружения в проекте Vercel:
+              </p>
+              <ul className="mt-2 text-sm list-disc list-inside text-amber-700 dark:text-amber-400">
+                <li>RAILSR_API_KEY - API ключ для доступа к Railsr API</li>
+                <li>RAILSR_PROGRAM_ID - ID программы в Railsr</li>
+                <li>RAILSR_API_URL - URL API Railsr (опционально)</li>
+              </ul>
             </div>
           </CardContent>
           <CardFooter>
@@ -112,32 +152,32 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center space-x-2">
               <div className="font-medium">Статус:</div>
-              {connectionStatus === "unknown" && <div>Неизвестно</div>}
-              {connectionStatus === "success" && (
+              {connectionStatus.status === "unknown" && <div>Проверка подключения...</div>}
+              {connectionStatus.status === "success" && (
                 <div className="flex items-center text-green-600">
                   <CheckCircle2 className="w-5 h-5 mr-1" /> Подключено
                 </div>
               )}
-              {connectionStatus === "error" && (
+              {connectionStatus.status === "error" && (
                 <div className="flex items-center text-red-600">
                   <AlertCircle className="w-5 h-5 mr-1" /> Ошибка подключения
                 </div>
               )}
             </div>
 
-            {errorDetails && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3 text-red-800">
+            {connectionStatus.status === "error" && connectionStatus.error && (
+              <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-md p-3 text-red-800 dark:text-red-300">
                 <p className="font-medium">Детали ошибки:</p>
-                <p className="text-sm mt-1">{errorDetails}</p>
+                <p className="text-sm mt-1">{connectionStatus.error}</p>
               </div>
             )}
 
-            {programInfo && (
+            {connectionStatus.status === "success" && connectionStatus.programInfo && (
               <>
                 <div className="space-y-2">
                   <div className="font-medium">Информация о программе:</div>
                   <div className="bg-secondary p-4 rounded-md">
-                    <pre className="text-xs overflow-auto">{JSON.stringify(programInfo, null, 2)}</pre>
+                    <pre className="text-xs overflow-auto">{JSON.stringify(connectionStatus.programInfo, null, 2)}</pre>
                   </div>
                 </div>
               </>

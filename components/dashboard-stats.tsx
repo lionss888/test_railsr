@@ -6,11 +6,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { RefreshCw, AlertCircle } from "lucide-react"
-import { CustomersAPI } from "@/lib/customers-api"
-import { AccountsAPI } from "@/lib/accounts-api"
-import { CardsAPI } from "@/lib/cards-api"
-import { TransactionsAPI } from "@/lib/transactions-api"
-import { config } from "@/lib/config"
 
 interface StatsData {
   customers: number
@@ -24,130 +19,30 @@ interface StatsData {
   }
 }
 
-// Моковые данные для использования при ошибках API
-const MOCK_STATS: StatsData = {
-  customers: 5,
-  accounts: 12,
-  cards: 8,
-  transactions: 47,
-  totalBalance: {
-    RUB: 250000,
-    USD: 3500,
-    EUR: 2800,
-  },
-}
-
 export function DashboardStats() {
   const [stats, setStats] = useState<StatsData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [useMockData, setUseMockData] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
 
   const fetchStats = async () => {
     setIsLoading(true)
     setError(null)
 
     try {
-      // Проверяем наличие необходимых переменных окружения
-      if (!config.railsrApiKey || !config.railsrProgramId) {
-        console.warn("Missing API key or program ID, using mock data")
-        setStats(MOCK_STATS)
-        setUseMockData(true)
-        return
+      // Используем API-маршрут для получения статистики
+      const response = await fetch("/api/dashboard/stats")
+      const data = await response.json()
+
+      if (data.success) {
+        setStats(data.data)
+        setUseMockData(data.isMockData)
+      } else {
+        throw new Error(data.error || "Не удалось загрузить статистику")
       }
-
-      // Используем моковые данные для разработки, если включен соответствующий режим
-      if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === "true") {
-        console.log("Using mock data (development mode)")
-        setStats(MOCK_STATS)
-        setUseMockData(true)
-        return
-      }
-
-      // Формируем статистику
-      const statsData: StatsData = {
-        customers: 0,
-        accounts: 0,
-        cards: 0,
-        transactions: 0,
-        totalBalance: {
-          RUB: 0,
-          USD: 0,
-          EUR: 0,
-        },
-      }
-
-      // Создаем экземпляры API клиентов с включенным режимом отладки
-      const debugMode = true
-      const customersApi = new CustomersAPI(config.railsrApiKey, config.railsrProgramId, config.railsrApiUrl, debugMode)
-      const accountsApi = new AccountsAPI(config.railsrApiKey, config.railsrProgramId, config.railsrApiUrl, debugMode)
-      const cardsApi = new CardsAPI(config.railsrApiKey, config.railsrProgramId, config.railsrApiUrl, debugMode)
-      const transactionsApi = new TransactionsAPI(
-        config.railsrApiKey,
-        config.railsrProgramId,
-        config.railsrApiUrl,
-        debugMode,
-      )
-
-      // Выполняем запросы по одному с обработкой ошибок для каждого запроса
-      try {
-        const customersResponse = await customersApi.listCustomers(1, 1)
-        statsData.customers = customersResponse.meta?.pagination?.total || 0
-      } catch (err) {
-        console.warn("Failed to fetch customers count:", err)
-      }
-
-      try {
-        const accountsResponse = await accountsApi.listAllAccounts(1, 1)
-        statsData.accounts = accountsResponse.meta?.pagination?.total || 0
-      } catch (err) {
-        console.warn("Failed to fetch accounts count:", err)
-      }
-
-      try {
-        const cardsResponse = await cardsApi.listAllCards(1, 1)
-        statsData.cards = cardsResponse.meta?.pagination?.total || 0
-      } catch (err) {
-        console.warn("Failed to fetch cards count:", err)
-      }
-
-      try {
-        const transactionsResponse = await transactionsApi.listAllTransactions(1, 1)
-        statsData.transactions = transactionsResponse.meta?.pagination?.total || 0
-      } catch (err) {
-        console.warn("Failed to fetch transactions count:", err)
-      }
-
-      // Получаем балансы по валютам с обработкой ошибок
-      try {
-        const balancesResponse = await accountsApi.getBalances()
-
-        if (balancesResponse && balancesResponse.data && Array.isArray(balancesResponse.data)) {
-          balancesResponse.data.forEach((balance: any) => {
-            if (
-              balance &&
-              balance.currency &&
-              statsData.totalBalance[balance.currency as keyof typeof statsData.totalBalance] !== undefined
-            ) {
-              statsData.totalBalance[balance.currency as keyof typeof statsData.totalBalance] =
-                balance.total_balance || balance.balance || 0
-            }
-          })
-        }
-      } catch (err) {
-        console.warn("Failed to fetch balances:", err)
-      }
-
-      setStats(statsData)
-      setUseMockData(false)
     } catch (err: any) {
       console.error("Error fetching stats:", err)
       setError(err.message || "Не удалось загрузить статистику")
-
-      // Используем моковые данные при ошибке
-      setStats(MOCK_STATS)
-      setUseMockData(true)
     } finally {
       setIsLoading(false)
     }
@@ -155,7 +50,6 @@ export function DashboardStats() {
 
   // Функция для повторной попытки загрузки данных
   const handleRetry = () => {
-    setRetryCount((prev) => prev + 1)
     fetchStats()
   }
 
