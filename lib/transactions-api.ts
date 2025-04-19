@@ -51,7 +51,20 @@ export class TransactionsAPI extends RailsrAPI {
 
   // Получение списка всех транзакций в системе
   async listAllTransactions(page = 1, perPage = 20) {
-    return this.fetchAPI(`/transactions?page=${page}&per_page=${perPage}`)
+    try {
+      return await this.fetchAPI(`/transactions?page=${page}&per_page=${perPage}`)
+    } catch (error) {
+      console.warn("Failed to fetch all transactions, trying alternative endpoint", error)
+
+      try {
+        // Пробуем альтернативный эндпоинт, если основной не работает
+        return await this.fetchAPI(`/program/transactions?page=${page}&per_page=${perPage}`)
+      } catch (fallbackError) {
+        console.error("Failed to fetch transactions from alternative endpoint", fallbackError)
+        // Возвращаем пустой результат в случае ошибки
+        return { data: [], meta: { pagination: { total: 0 } } }
+      }
+    }
   }
 
   // Создание платежа

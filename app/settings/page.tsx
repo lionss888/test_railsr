@@ -15,13 +15,20 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<"unknown" | "success" | "error">("unknown")
   const [programInfo, setProgramInfo] = useState<any>(null)
+  const [errorDetails, setErrorDetails] = useState<string | null>(null)
 
   // Проверка подключения к API
   const checkConnection = async () => {
     setIsLoading(true)
     setConnectionStatus("unknown")
+    setErrorDetails(null)
 
     try {
+      // Проверяем наличие необходимых переменных окружения
+      if (!config.railsrApiKey || !config.railsrProgramId) {
+        throw new Error("Отсутствуют API ключ или ID программы. Проверьте переменные окружения.")
+      }
+
       const api = new RailsrAPI(config.railsrApiKey, config.railsrProgramId, config.railsrApiUrl)
       const info = await api.getProgramInfo()
 
@@ -32,9 +39,10 @@ export default function SettingsPage() {
         title: "Подключение успешно",
         description: "Соединение с API Railsr установлено",
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error("API connection error:", error)
       setConnectionStatus("error")
+      setErrorDetails(error.message || "Неизвестная ошибка")
 
       toast({
         title: "Ошибка подключения",
@@ -116,6 +124,13 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+
+            {errorDetails && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 text-red-800">
+                <p className="font-medium">Детали ошибки:</p>
+                <p className="text-sm mt-1">{errorDetails}</p>
+              </div>
+            )}
 
             {programInfo && (
               <>

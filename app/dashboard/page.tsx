@@ -2,7 +2,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { DashboardStats } from "@/components/dashboard-stats"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { config } from "@/lib/config"
 
 export default function DashboardPage() {
   return (
@@ -40,12 +39,9 @@ export default function DashboardPage() {
             <Button asChild variant="outline" className="w-full justify-start">
               <Link href="/transactions/new">Создать транзакцию</Link>
             </Button>
-            {/* Отображаем кнопку настройки вебхука только если они включены */}
-            {config.webhooksEnabled && (
-              <Button asChild variant="outline" className="w-full justify-start">
-                <Link href="/webhooks/new">Настроить вебхук</Link>
-              </Button>
-            )}
+            <Button asChild variant="outline" className="w-full justify-start">
+              <Link href="/webhooks/new">Настроить вебхук</Link>
+            </Button>
           </CardContent>
         </Card>
 
@@ -75,14 +71,11 @@ export default function DashboardPage() {
                   Руководства
                 </a>
               </Button>
-              {/* Отображаем кнопку вебхуков только если они включены */}
-              {config.webhooksEnabled && (
-                <Button asChild variant="outline" className="w-full">
-                  <a href="https://docs.railsr.com/webhooks" target="_blank" rel="noopener noreferrer">
-                    Вебхуки
-                  </a>
-                </Button>
-              )}
+              <Button asChild variant="outline" className="w-full">
+                <a href="https://docs.railsr.com/webhooks" target="_blank" rel="noopener noreferrer">
+                  Вебхуки
+                </a>
+              </Button>
             </div>
           </CardContent>
         </Card>

@@ -67,7 +67,49 @@ export class AccountsAPI extends RailsrAPI {
   }
 
   // Получение балансов по валютам
-  async getBalancesByCurrency() {
-    return this.fetchAPI(`/accounts/balances/by-currency`)
+  // Этот метод пытается получить балансы разными способами в зависимости от API
+  async getBalances() {
+    try {
+      // Сначала пробуем получить балансы по валютам через специальный эндпоинт
+      return await this.fetchAPI(`/accounts/balances/by-currency`)
+    } catch (error) {
+      console.warn("Failed to fetch balances by currency, trying alternative method", error)
+
+      try {
+        // Если первый метод не сработал, пробуем получить все счета и суммировать балансы
+        const accounts = await this.listAllAccounts(1, 100)
+
+        if (!accounts.data || !Array.isArray(accounts.data)) {
+          throw new Error("Invalid accounts data format")
+        }
+
+        // Группируем счета по валюте и суммируем балансы
+        const balancesByCurrency: Record<string, number> = {}
+
+        accounts.data.forEach((account: any) => {
+          if (account.currency && account.balance) {
+            if (!balancesByCurrency[account.currency]) {
+              balancesByCurrency[account.currency] = 0
+            }
+            balancesByCurrency[account.currency] += Number.parseFloat(account.balance)
+          }
+        })
+
+        // Преобразуем в формат, совместимый с API
+        const result = {
+          data: Object.entries(balancesByCurrency).map(([currency, balance]) => ({
+            currency,
+            total_balance: balance,
+          })),
+        }
+
+        return result
+      } catch (error) {
+        console.error("Failed to calculate balances from accounts", error)
+
+        // Возвращаем пустой результат в случае ошибки
+        return { data: [] }
+      }
+    }
   }
 }
